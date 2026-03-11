@@ -1,0 +1,4 @@
+scenario,baseline_cost,scenario_cost,absolute_savings,savings_pct,risk_level,assumptions
+carrier_tier_switch,5034.5,4613.302000000001,421.1979999999994,8.366232992352755,medium,Switched eligible lanes to lower-cost carrier tiers using configured unit-rate deltas; default delta -8%.
+lead_time_relaxation,5034.5,4956.5,78.0,1.5493097626377992,low,Downgraded 35% of urgent shipments to standard lead time with -15% freight-rate impact.
+shipment_consolidation,5034.5,5034.5,0.0,0.0,low,Consolidated small shipments (<= 100.0) on route-carrier groups with >= 3 shipments at 12% unit-cost reduction.

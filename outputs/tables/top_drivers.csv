@@ -1,0 +1,13 @@
+driver_value,total_cost,cost_share_pct,driver,source_table
+Site A -> Kenya,1616.3,32.1,route,by_route
+Site B -> Uganda,1200.0,23.84,route,by_route
+Site C -> Rwanda,1148.2,22.81,route,by_route
+Air,2978.2,59.16,carrier,by_carrier
+Truck,2056.3,40.84,carrier,by_carrier
+Kenya,1616.3,32.1,geography,by_geography
+Uganda,1200.0,23.84,geography,by_geography
+Rwanda,1148.2,22.81,geography,by_geography
+small,2978.2,59.16,shipment_size_bucket,by_shipment_size_bucket
+medium,2056.3,40.84,shipment_size_bucket,by_shipment_size_bucket
+urgent,2978.2,59.16,urgency,by_urgency
+standard,2056.3,40.84,urgency,by_urgency

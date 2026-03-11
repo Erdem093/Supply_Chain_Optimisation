@@ -1,0 +1,11 @@
+ID,Country,Fulfill Via,Shipment Mode,PO Sent to Vendor Date,Manufacturing Site,Line Item Quantity,Freight Cost (USD)
+S0001,Kenya,Air,Urgent Air,2024-01-02,Site A,30,520
+S0002,Kenya,Truck,Standard,2024-01-02,Site A,120,310
+S0003,Uganda,Air,Urgent Air,2024-01-03,Site B,45,610
+S0004,Tanzania,Truck,Standard,2024-01-03,Site A,200,450
+S0005,Uganda,Air,Urgent Air,2024-01-04,Site B,25,590
+S0006,Kenya,Truck,Standard,2024-01-04,Site A,180,400
+S0007,Rwanda,Air,Urgent Air,2024-01-05,Site C,22,640
+S0008,Rwanda,Truck,Standard,2024-01-05,Site C,300,510
+S0009,Tanzania,Air,Urgent Air,2024-01-06,Site A,40,620
+S0010,Kenya,Truck,Standard,2024-01-06,Site A,150,380

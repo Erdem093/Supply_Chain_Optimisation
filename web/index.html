@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Supply Tracker | Logistics Cost Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="shell">
+        <nav class="nav">
+          <div class="brand">Supply Tracker</div>
+          <div class="nav-actions">
+            <a class="btn btn-ghost" href="#results">Live Results</a>
+            <a class="btn" href="../outputs/recommendation_onepager.md">One-Pager</a>
+          </div>
+        </nav>
+
+        <div class="hero-grid">
+          <div>
+            <p class="eyebrow">Supply Chain Cost Optimization</p>
+            <h1>Operational cost intelligence, ready for stakeholder decisions.</h1>
+            <p class="lead">
+              Ingests shipment pricing data, isolates dominant cost drivers, models optimization scenarios, and surfaces
+              clear recommendations with quantified savings.
+            </p>
+            <div class="hero-quick">
+              <div><span>Goal</span><strong>Reduce Total Logistics Cost</strong></div>
+              <div><span>Data Source</span><strong>Kaggle Shipment Pricing</strong></div>
+              <div><span>Model Type</span><strong>Deterministic What-If Simulation</strong></div>
+            </div>
+          </div>
+
+          <aside class="hero-panel" aria-live="polite">
+            <h2>Pipeline Status</h2>
+            <p id="status-text">Checking output artifacts...</p>
+            <ul>
+              <li><code>outputs/tables/scenario_results.csv</code></li>
+              <li><code>outputs/tables/baseline.csv</code></li>
+              <li><code>outputs/tables/top_drivers.csv</code></li>
+              <li><code>outputs/recommendation_onepager.md</code></li>
+            </ul>
+          </aside>
+        </div>
+      </div>
+    </header>
+
+    <main id="results" class="shell">
+      <section class="section">
+        <h2>How The Analysis Works</h2>
+        <div class="flow-grid">
+          <article class="flow-card">
+            <h3>1. Normalize Data</h3>
+            <p>Map inconsistent columns, parse dates/numerics, enforce non-negative costs, and handle outliers.</p>
+          </article>
+          <article class="flow-card">
+            <h3>2. Diagnose Drivers</h3>
+            <p>Rank spend concentration by route, carrier, geography, shipment size, and urgency class.</p>
+          </article>
+          <article class="flow-card">
+            <h3>3. Simulate Scenarios</h3>
+            <p>Estimate savings from consolidation, carrier-tier changes, and lead-time relaxation.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Live KPI Snapshot</h2>
+        <div id="kpi-cards" class="kpi-grid">
+          <article class="kpi-card"><p class="kpi-label">Total Logistics Cost</p><p class="kpi-value">--</p></article>
+          <article class="kpi-card"><p class="kpi-label">Total Shipments</p><p class="kpi-value">--</p></article>
+          <article class="kpi-card"><p class="kpi-label">Avg Cost / Shipment</p><p class="kpi-value">--</p></article>
+          <article class="kpi-card"><p class="kpi-label">Best Scenario Savings</p><p class="kpi-value">--</p></article>
+        </div>
+      </section>
+
+      <section class="section two-col">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Scenario Leaderboard</h2>
+            <p>Ranked by absolute savings</p>
+          </div>
+          <div id="scenario-cards" class="scenario-cards"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Top Cost Drivers</h2>
+            <p>Highest contributors to baseline spend</p>
+          </div>
+          <div id="driver-list" class="driver-list"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Generated Visuals</h2>
+        <div class="gallery">
+          <figure>
+            <img src="../outputs/figures/scenario_savings.png" alt="Estimated scenario savings bar chart" loading="lazy" />
+            <figcaption>Scenario savings comparison</figcaption>
+          </figure>
+          <figure>
+            <img src="../outputs/figures/by_route.png" alt="Route cost driver chart" loading="lazy" />
+            <figcaption>Route-level cost concentration</figcaption>
+          </figure>
+          <figure>
+            <img src="../outputs/figures/by_carrier.png" alt="Carrier cost driver chart" loading="lazy" />
+            <figcaption>Carrier-level cost concentration</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="section panel">
+        <div class="panel-head">
+          <h2>Recommendation Brief</h2>
+          <p>Loaded from pipeline output</p>
+        </div>
+        <pre id="recommendation-box">Loading recommendation...</pre>
+      </section>
+    </main>
+
+    <footer class="shell footer">
+      <p>Objective: cost-to-serve reduction through transport and logistics optimization.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
