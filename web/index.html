@@ -23,10 +23,6 @@
       <div class="shell">
         <nav class="nav">
           <a class="brand" href="#top">Supply Tracker</a>
-          <div class="nav-actions">
-            <a class="btn btn-ghost" href="#route-intel">Route Intelligence</a>
-            <a class="btn" href="#executive-brief">Executive Brief</a>
-          </div>
         </nav>
 
         <div class="hero-grid">
@@ -40,7 +36,7 @@
           </div>
 
           <div class="impact-header" aria-live="polite">
-            <h2>Impact Header</h2>
+            <h2>Impact Header <span id="mode-badge" class="mode-badge">DEMO MODE</span></h2>
             <div class="impact-grid">
               <article>
                 <p>Baseline Cost</p>
@@ -69,29 +65,44 @@
       <section id="route-intel" class="section">
         <div class="section-title-row">
           <h2>Interactive Route Intelligence</h2>
-          <p>3D globe by default, automatic 2D fallback where WebGL is unavailable.</p>
-        </div>
-
-        <div class="controls-panel">
-          <label>
-            Scenario
-            <select id="scenario-filter"></select>
-          </label>
-          <label>
-            Carrier
-            <select id="carrier-filter"></select>
-          </label>
-          <label>
-            Top Routes
-            <input id="topn-filter" type="range" min="3" max="20" step="1" value="8" />
-            <span id="topn-value">8</span>
-          </label>
-          <button id="animation-toggle" class="btn btn-small" type="button">Pause Rotation</button>
+          <p>Global route sweeps with 3D globe and automatic 2D fallback.</p>
         </div>
 
         <div class="map-panel">
           <div id="globe-view" class="viz-canvas"></div>
           <div id="map-view" class="viz-canvas" hidden></div>
+
+          <aside id="overlay-controls" class="overlay-controls" aria-label="Globe controls">
+            <button id="overlay-toggle" class="btn btn-small btn-overlay" type="button" aria-expanded="true">
+              Hide Controls
+            </button>
+            <div id="overlay-body" class="overlay-body">
+              <label>
+                Scenario
+                <select id="scenario-filter"></select>
+              </label>
+              <label>
+                Carrier
+                <select id="carrier-filter"></select>
+              </label>
+              <label>
+                Top Routes
+                <input id="topn-filter" type="range" min="3" max="40" step="1" value="12" />
+                <span id="topn-value">12</span>
+              </label>
+              <button id="animation-toggle" class="btn btn-small" type="button">Pause Rotation</button>
+
+              <div class="upload-box">
+                <label>
+                  Upload CSV (local only)
+                  <input id="upload-csv" type="file" accept=".csv,text/csv" />
+                </label>
+                <button id="reset-upload" class="btn btn-small btn-ghost" type="button">Use Demo Data</button>
+                <p id="upload-status" class="upload-status">No file uploaded.</p>
+              </div>
+            </div>
+          </aside>
+
           <p id="map-note" class="map-note">Loading route visualization...</p>
         </div>
       </section>
@@ -120,6 +131,7 @@
               <p id="compare-savings-pct" class="metric-value highlight">--</p>
             </div>
           </div>
+          <p id="compare-note" class="compare-note"></p>
         </article>
 
         <article class="panel">

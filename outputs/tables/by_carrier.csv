@@ -1,3 +1,5 @@
 driver_value,total_cost,cost_share_pct,driver
-Air,2978.2,59.16,carrier
-Truck,2056.3,40.84,carrier
+Air,84100,49.92,carrier
+Ocean,44431,26.37,carrier
+Truck,23746,14.09,carrier
+Rail,16200,9.62,carrier

@@ -1,13 +1,14 @@
 driver_value,total_cost,cost_share_pct,driver,source_table
-Site A -> Kenya,1616.3,32.1,route,by_route
-Site B -> Uganda,1200.0,23.84,route,by_route
-Site C -> Rwanda,1148.2,22.81,route,by_route
-Air,2978.2,59.16,carrier,by_carrier
-Truck,2056.3,40.84,carrier,by_carrier
-Kenya,1616.3,32.1,geography,by_geography
-Uganda,1200.0,23.84,geography,by_geography
-Rwanda,1148.2,22.81,geography,by_geography
-small,2978.2,59.16,shipment_size_bucket,by_shipment_size_bucket
-medium,2056.3,40.84,shipment_size_bucket,by_shipment_size_bucket
-urgent,2978.2,59.16,urgency,by_urgency
-standard,2056.3,40.84,urgency,by_urgency
+Shanghai Hub -> Australia,10031,5.95,route,by_route
+Los Angeles Hub -> China,9800,5.82,route,by_route
+Singapore Hub -> South Korea,9300,5.52,route,by_route
+Air,84100,49.92,carrier,by_carrier
+Ocean,44431,26.37,carrier,by_carrier
+Truck,23746,14.09,carrier,by_carrier
+Australia,10031,5.95,geography,by_geography
+China,9800,5.82,geography,by_geography
+South Korea,9300,5.52,geography,by_geography
+medium,160877,95.49,shipment_size_bucket,by_shipment_size_bucket
+small,7600,4.51,shipment_size_bucket,by_shipment_size_bucket
+standard,84377,50.08,urgency,by_urgency
+urgent,84100,49.92,urgency,by_urgency

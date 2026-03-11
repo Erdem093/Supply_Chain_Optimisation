@@ -1,5 +1,11 @@
 driver_value,total_cost,cost_share_pct,driver
-Site A -> Kenya,1616.3,32.1,route
-Site B -> Uganda,1200.0,23.84,route
-Site C -> Rwanda,1148.2,22.81,route
-Site A -> Tanzania,1070.0,21.25,route
+Shanghai Hub -> Australia,10031,5.95,route
+Los Angeles Hub -> China,9800,5.82,route
+Singapore Hub -> South Korea,9300,5.52,route
+London Hub -> Japan,8600,5.1,route
+Johannesburg Hub -> Argentina,8400,4.99,route
+Nairobi Hub -> United States,8200,4.87,route
+Mumbai Hub -> New Zealand,7900,4.69,route
+Nairobi Hub -> United Kingdom,7900,4.69,route
+Sydney Hub -> Singapore,7700,4.57,route
+Dubai Hub -> Brazil,7600,4.51,route

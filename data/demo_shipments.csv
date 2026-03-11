@@ -1,11 +1,25 @@
 ID,Country,Fulfill Via,Shipment Mode,PO Sent to Vendor Date,Manufacturing Site,Line Item Quantity,Freight Cost (USD)
-S0001,Kenya,Air,Urgent Air,2024-01-02,Site A,30,520
-S0002,Kenya,Truck,Standard,2024-01-02,Site A,120,310
-S0003,Uganda,Air,Urgent Air,2024-01-03,Site B,45,610
-S0004,Tanzania,Truck,Standard,2024-01-03,Site A,200,450
-S0005,Uganda,Air,Urgent Air,2024-01-04,Site B,25,590
-S0006,Kenya,Truck,Standard,2024-01-04,Site A,180,400
-S0007,Rwanda,Air,Urgent Air,2024-01-05,Site C,22,640
-S0008,Rwanda,Truck,Standard,2024-01-05,Site C,300,510
-S0009,Tanzania,Air,Urgent Air,2024-01-06,Site A,40,620
-S0010,Kenya,Truck,Standard,2024-01-06,Site A,150,380
+S0001,United States,Air,Urgent Air,2024-01-02,Nairobi Hub,120,8200
+S0002,Canada,Ocean,Standard,2024-01-03,Rotterdam Hub,350,6900
+S0003,Brazil,Air,Urgent Air,2024-01-04,Dubai Hub,95,7600
+S0004,Chile,Truck,Standard,2024-01-05,Sao Paulo Hub,410,4300
+S0005,United Kingdom,Air,Urgent Air,2024-01-06,Nairobi Hub,140,7900
+S0006,Germany,Rail,Standard,2024-01-07,Johannesburg Hub,500,5100
+S0007,Nigeria,Truck,Standard,2024-01-08,London Hub,320,4700
+S0008,South Africa,Air,Urgent Air,2024-01-09,Mumbai Hub,220,6800
+S0009,United Arab Emirates,Air,Urgent Air,2024-01-10,Singapore Hub,180,7100
+S0010,Saudi Arabia,Truck,Standard,2024-01-11,Istanbul Hub,420,5200
+S0011,India,Rail,Standard,2024-01-12,Dubai Hub,610,5600
+S0012,Pakistan,Air,Urgent Air,2024-01-13,Frankfurt Hub,155,7300
+S0013,China,Ocean,Standard,2024-01-14,Los Angeles Hub,820,9800
+S0014,Japan,Air,Urgent Air,2024-01-15,London Hub,145,8600
+S0015,South Korea,Ocean,Standard,2024-01-16,Singapore Hub,760,9300
+S0016,Singapore,Air,Urgent Air,2024-01-17,Sydney Hub,130,7700
+S0017,Australia,Ocean,Standard,2024-01-18,Shanghai Hub,920,10100
+S0018,New Zealand,Air,Urgent Air,2024-01-19,Mumbai Hub,160,7900
+S0019,Kenya,Truck,Standard,2024-01-20,Frankfurt Hub,300,4500
+S0020,Egypt,Air,Urgent Air,2024-01-21,Los Angeles Hub,190,7400
+S0021,Turkey,Rail,Standard,2024-01-22,Singapore Hub,540,5500
+S0022,Mexico,Truck,Standard,2024-01-23,Rotterdam Hub,460,5000
+S0023,Argentina,Ocean,Standard,2024-01-24,Johannesburg Hub,680,8400
+S0024,France,Air,Urgent Air,2024-01-25,Nairobi Hub,170,7600

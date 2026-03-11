@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-03-11T22:28:44.609067+00:00",
+  "generated_at": "2026-03-11T22:44:06.330610+00:00",
   "dataset_name": "demo_shipments.csv",
   "key_totals": {
-    "total_shipments": 10,
-    "total_logistics_cost": 5034.5,
-    "unique_routes": 4,
-    "unique_carriers": 2
+    "total_shipments": 24,
+    "total_logistics_cost": 168477.0,
+    "unique_routes": 24,
+    "unique_carriers": 4
   },
   "best_scenario": {
     "name": "carrier_tier_switch",
-    "absolute_savings": 421.1979999999994,
-    "savings_pct": 8.366232992352755,
+    "absolute_savings": 12908.0,
+    "savings_pct": 7.661579918920683,
     "risk_level": "medium"
   }
 }

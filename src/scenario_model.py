@@ -48,7 +48,7 @@ def _apply_carrier_switch(df: pd.DataFrame, config: dict) -> tuple[pd.DataFrame,
     tier_map = cfg.get("target_tier_map", {})
 
     out = df.copy()
-    out["scenario_cost"] = out[CANONICAL.freight_cost]
+    out["scenario_cost"] = out[CANONICAL.freight_cost].astype(float)
 
     if eligible_lanes:
         lane_mask = out[CANONICAL.route].isin(eligible_lanes)

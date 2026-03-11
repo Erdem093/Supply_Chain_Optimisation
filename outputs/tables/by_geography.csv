@@ -1,5 +1,11 @@
 driver_value,total_cost,cost_share_pct,driver
-Kenya,1616.3,32.1,geography
-Uganda,1200.0,23.84,geography
-Rwanda,1148.2,22.81,geography
-Tanzania,1070.0,21.25,geography
+Australia,10031,5.95,geography
+China,9800,5.82,geography
+South Korea,9300,5.52,geography
+Japan,8600,5.1,geography
+Argentina,8400,4.99,geography
+United States,8200,4.87,geography
+New Zealand,7900,4.69,geography
+United Kingdom,7900,4.69,geography
+Singapore,7700,4.57,geography
+Brazil,7600,4.51,geography
