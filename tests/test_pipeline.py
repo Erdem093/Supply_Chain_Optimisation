@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -105,3 +106,20 @@ def test_end_to_end_outputs_and_runtime(tmp_path: Path) -> None:
     fig_dir = out_dir / "figures"
     assert any(table_dir.glob("*.csv"))
     assert any(fig_dir.glob("*.png"))
+
+    route_file = table_dir / "route_network.csv"
+    assert route_file.exists()
+    route_df = pd.read_csv(route_file)
+    required_cols = {"origin", "destination", "total_cost", "shipment_count", "cost_share_pct"}
+    assert required_cols.issubset(set(route_df.columns))
+    assert (route_df["total_cost"] >= 0).all()
+    assert (route_df["shipment_count"] >= 0).all()
+
+    baseline = pd.read_csv(table_dir / "baseline.csv")
+    baseline_cost = float(baseline.loc[baseline["metric"] == "total_logistics_cost", "value"].iloc[0])
+    assert abs(float(route_df["total_cost"].sum()) - baseline_cost) < 1e-6
+
+    metadata_file = out_dir / "metadata.json"
+    assert metadata_file.exists()
+    metadata = json.loads(metadata_file.read_text())
+    assert {"generated_at", "dataset_name", "key_totals"}.issubset(set(metadata.keys()))

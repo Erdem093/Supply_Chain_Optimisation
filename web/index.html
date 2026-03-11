@@ -3,12 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Supply Tracker | Logistics Cost Intelligence</title>
+    <title>Supply Tracker | Supply Chain Optimisation Intelligence</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap"
       rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -16,120 +22,188 @@
     <header class="hero">
       <div class="shell">
         <nav class="nav">
-          <div class="brand">Supply Tracker</div>
+          <a class="brand" href="#top">Supply Tracker</a>
           <div class="nav-actions">
-            <a class="btn btn-ghost" href="#results">Live Results</a>
-            <a class="btn" href="../outputs/recommendation_onepager.md">One-Pager</a>
+            <a class="btn btn-ghost" href="#route-intel">Route Intelligence</a>
+            <a class="btn" href="#executive-brief">Executive Brief</a>
           </div>
         </nav>
 
         <div class="hero-grid">
           <div>
-            <p class="eyebrow">Supply Chain Cost Optimization</p>
-            <h1>Operational cost intelligence, ready for stakeholder decisions.</h1>
-            <p class="lead">
-              Ingests shipment pricing data, isolates dominant cost drivers, models optimization scenarios, and surfaces
-              clear recommendations with quantified savings.
+            <p class="kicker">Supply Chain Cost Optimisation</p>
+            <h1>Reduce logistics spend with route-level intelligence and scenario simulation.</h1>
+            <p class="hero-copy">
+              A deployable analytics product that exposes where costs accumulate, quantifies savings opportunities, and
+              converts analysis into an implementation-ready executive plan.
             </p>
-            <div class="hero-quick">
-              <div><span>Goal</span><strong>Reduce Total Logistics Cost</strong></div>
-              <div><span>Data Source</span><strong>Kaggle Shipment Pricing</strong></div>
-              <div><span>Model Type</span><strong>Deterministic What-If Simulation</strong></div>
-            </div>
           </div>
 
-          <aside class="hero-panel" aria-live="polite">
-            <h2>Pipeline Status</h2>
-            <p id="status-text">Checking output artifacts...</p>
-            <ul>
-              <li><code>outputs/tables/scenario_results.csv</code></li>
-              <li><code>outputs/tables/baseline.csv</code></li>
-              <li><code>outputs/tables/top_drivers.csv</code></li>
-              <li><code>outputs/recommendation_onepager.md</code></li>
-            </ul>
-          </aside>
+          <div class="impact-header" aria-live="polite">
+            <h2>Impact Header</h2>
+            <div class="impact-grid">
+              <article>
+                <p>Baseline Cost</p>
+                <strong id="impact-baseline">--</strong>
+              </article>
+              <article>
+                <p>Best Savings</p>
+                <strong id="impact-savings">--</strong>
+              </article>
+              <article>
+                <p>Top Lane</p>
+                <strong id="impact-top-lane">--</strong>
+              </article>
+              <article>
+                <p>Data Freshness</p>
+                <strong id="impact-freshness">--</strong>
+              </article>
+            </div>
+            <p class="confidence" id="impact-confidence">Confidence: waiting for generated outputs...</p>
+          </div>
         </div>
       </div>
     </header>
 
-    <main id="results" class="shell">
-      <section class="section">
-        <h2>How The Analysis Works</h2>
-        <div class="flow-grid">
-          <article class="flow-card">
-            <h3>1. Normalize Data</h3>
-            <p>Map inconsistent columns, parse dates/numerics, enforce non-negative costs, and handle outliers.</p>
-          </article>
-          <article class="flow-card">
-            <h3>2. Diagnose Drivers</h3>
-            <p>Rank spend concentration by route, carrier, geography, shipment size, and urgency class.</p>
-          </article>
-          <article class="flow-card">
-            <h3>3. Simulate Scenarios</h3>
-            <p>Estimate savings from consolidation, carrier-tier changes, and lead-time relaxation.</p>
-          </article>
+    <main class="shell">
+      <section id="route-intel" class="section">
+        <div class="section-title-row">
+          <h2>Interactive Route Intelligence</h2>
+          <p>3D globe by default, automatic 2D fallback where WebGL is unavailable.</p>
         </div>
-      </section>
 
-      <section class="section">
-        <h2>Live KPI Snapshot</h2>
-        <div id="kpi-cards" class="kpi-grid">
-          <article class="kpi-card"><p class="kpi-label">Total Logistics Cost</p><p class="kpi-value">--</p></article>
-          <article class="kpi-card"><p class="kpi-label">Total Shipments</p><p class="kpi-value">--</p></article>
-          <article class="kpi-card"><p class="kpi-label">Avg Cost / Shipment</p><p class="kpi-value">--</p></article>
-          <article class="kpi-card"><p class="kpi-label">Best Scenario Savings</p><p class="kpi-value">--</p></article>
+        <div class="controls-panel">
+          <label>
+            Scenario
+            <select id="scenario-filter"></select>
+          </label>
+          <label>
+            Carrier
+            <select id="carrier-filter"></select>
+          </label>
+          <label>
+            Top Routes
+            <input id="topn-filter" type="range" min="3" max="20" step="1" value="8" />
+            <span id="topn-value">8</span>
+          </label>
+          <button id="animation-toggle" class="btn btn-small" type="button">Pause Rotation</button>
+        </div>
+
+        <div class="map-panel">
+          <div id="globe-view" class="viz-canvas"></div>
+          <div id="map-view" class="viz-canvas" hidden></div>
+          <p id="map-note" class="map-note">Loading route visualization...</p>
         </div>
       </section>
 
       <section class="section two-col">
-        <div class="panel">
+        <article class="panel">
           <div class="panel-head">
-            <h2>Scenario Leaderboard</h2>
-            <p>Ranked by absolute savings</p>
+            <h3>Before vs After</h3>
+            <p>Scenario-adjusted logistics cost view</p>
           </div>
-          <div id="scenario-cards" class="scenario-cards"></div>
-        </div>
+          <div class="compare-grid">
+            <div>
+              <p class="metric-label">Baseline Cost</p>
+              <p id="compare-baseline" class="metric-value">--</p>
+            </div>
+            <div>
+              <p class="metric-label">Scenario Cost</p>
+              <p id="compare-scenario" class="metric-value">--</p>
+            </div>
+            <div>
+              <p class="metric-label">Absolute Savings</p>
+              <p id="compare-savings" class="metric-value highlight">--</p>
+            </div>
+            <div>
+              <p class="metric-label">Savings %</p>
+              <p id="compare-savings-pct" class="metric-value highlight">--</p>
+            </div>
+          </div>
+        </article>
 
-        <div class="panel">
+        <article class="panel">
           <div class="panel-head">
-            <h2>Top Cost Drivers</h2>
-            <p>Highest contributors to baseline spend</p>
+            <h3>Scenario Leaderboard</h3>
+            <p>Prioritized by value</p>
           </div>
-          <div id="driver-list" class="driver-list"></div>
-        </div>
+          <div id="scenario-list" class="scenario-list"></div>
+        </article>
       </section>
 
-      <section class="section">
-        <h2>Generated Visuals</h2>
-        <div class="gallery">
-          <figure>
-            <img src="../outputs/figures/scenario_savings.png" alt="Estimated scenario savings bar chart" loading="lazy" />
-            <figcaption>Scenario savings comparison</figcaption>
-          </figure>
-          <figure>
-            <img src="../outputs/figures/by_route.png" alt="Route cost driver chart" loading="lazy" />
-            <figcaption>Route-level cost concentration</figcaption>
-          </figure>
-          <figure>
-            <img src="../outputs/figures/by_carrier.png" alt="Carrier cost driver chart" loading="lazy" />
-            <figcaption>Carrier-level cost concentration</figcaption>
-          </figure>
+      <section id="executive-brief" class="section panel">
+        <div class="panel-head">
+          <h3>Executive Brief</h3>
+          <p>Recommendation output, transformed for decision makers</p>
+        </div>
+
+        <div class="brief-grid">
+          <article>
+            <h4>Opportunity Summary</h4>
+            <p id="brief-opportunity">Loading summary...</p>
+          </article>
+          <article>
+            <h4>Prioritized Actions</h4>
+            <ol id="brief-actions" class="brief-list"></ol>
+          </article>
+          <article>
+            <h4>Risk & Assumptions</h4>
+            <ul id="brief-risks" class="brief-list"></ul>
+          </article>
+          <article>
+            <h4>30 / 60 / 90-Day Plan</h4>
+            <ul id="brief-3090" class="brief-list"></ul>
+          </article>
         </div>
       </section>
 
       <section class="section panel">
         <div class="panel-head">
-          <h2>Recommendation Brief</h2>
-          <p>Loaded from pipeline output</p>
+          <h3>Top Cost Drivers</h3>
+          <p>Dominant contributors to baseline spend</p>
         </div>
-        <pre id="recommendation-box">Loading recommendation...</pre>
+        <div id="driver-list" class="driver-list"></div>
+      </section>
+
+      <section class="section panel">
+        <div class="panel-head">
+          <h3>Generated Visuals</h3>
+          <p>Output figures from the analytics pipeline</p>
+        </div>
+        <div class="gallery">
+          <figure>
+            <img src="../outputs/figures/scenario_savings.png" alt="Scenario savings chart" loading="lazy" />
+            <figcaption>Scenario savings comparison</figcaption>
+          </figure>
+          <figure>
+            <img src="../outputs/figures/by_route.png" alt="Route cost drivers chart" loading="lazy" />
+            <figcaption>Route-level cost concentration</figcaption>
+          </figure>
+          <figure>
+            <img src="../outputs/figures/by_carrier.png" alt="Carrier cost drivers chart" loading="lazy" />
+            <figcaption>Carrier-level cost concentration</figcaption>
+          </figure>
+        </div>
       </section>
     </main>
 
-    <footer class="shell footer">
-      <p>Objective: cost-to-serve reduction through transport and logistics optimization.</p>
+    <footer class="footer">
+      <div class="shell footer-inner">
+        <p>Built for transport cost-to-serve optimization and stakeholder-ready decisioning.</p>
+        <div class="socials">
+          <a href="https://github.com/Erdem093" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://www.linkedin.com/in/erdem-arslan-b61a992a7/" target="_blank" rel="noreferrer">LinkedIn</a>
+        </div>
+      </div>
     </footer>
 
+    <script src="https://unpkg.com/three@0.165.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/globe.gl"></script>
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
     <script src="app.js"></script>
   </body>
 </html>

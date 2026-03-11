@@ -1,0 +1,8 @@
+origin,destination,total_cost,shipment_count,cost_share_pct,carrier
+Site B,Uganda,1200.0,2,23.84,Air
+Site A,Kenya,1096.3,3,21.78,Truck
+Site C,Rwanda,638.2,1,12.68,Air
+Site A,Tanzania,620.0,1,12.32,Air
+Site A,Kenya,520.0,1,10.33,Air
+Site C,Rwanda,510.0,1,10.13,Truck
+Site A,Tanzania,450.0,1,8.94,Truck

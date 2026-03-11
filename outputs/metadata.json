@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-03-11T22:28:44.609067+00:00",
+  "dataset_name": "demo_shipments.csv",
+  "key_totals": {
+    "total_shipments": 10,
+    "total_logistics_cost": 5034.5,
+    "unique_routes": 4,
+    "unique_carriers": 2
+  },
+  "best_scenario": {
+    "name": "carrier_tier_switch",
+    "absolute_savings": 421.1979999999994,
+    "savings_pct": 8.366232992352755,
+    "risk_level": "medium"
+  }
+}
