@@ -141,6 +141,8 @@ const state = {
   scenarioRows: [],
   driverRows: [],
   routeRows: [],
+  carrierRows: [],
+  urgencyRows: [],
   metadata: null,
   coords: {},
   selectedScenario: "baseline",
@@ -150,7 +152,10 @@ const state = {
   map: null,
   mapLayers: [],
   rotating: true,
-  uploadMode: false
+  uploadMode: false,
+  viewMode: "3d",
+  charts: {},
+  maskUpdater: null
 };
 
 function getBaselineCost() {
@@ -179,9 +184,8 @@ function withAdjustedCost() {
 
 function filteredRoutes() {
   return withAdjustedCost()
-    .filter((r) => (state.selectedCarrier === "all" ? true : normalizeText(r.carrier_norm) === state.selectedCarrier))
     .sort((a, b) => b.adjusted_cost - a.adjusted_cost)
-    .slice(0, state.topN);
+    .slice(0, 30);
 }
 
 function coordFor(name) {
@@ -198,43 +202,78 @@ function wrapLon(lon) {
   return v;
 }
 
-function buildSweepPath(origin, destination) {
-  const o = coordFor(origin);
-  const d = coordFor(destination);
-
-  const midLat = (o.lat + d.lat) / 2;
-  const midLon = wrapLon((o.lon + d.lon) / 2);
-  const lonDiff = Math.abs(o.lon - d.lon);
-  const useSweep = lonDiff < 70;
-
-  if (!useSweep) {
-    return [
-      { lat: o.lat, lng: o.lon, altitude: 0.02 },
-      { lat: d.lat, lng: d.lon, altitude: 0.02 }
-    ];
-  }
-
-  const sweepLon = wrapLon(midLon + 170);
-  const sweepLat = Math.max(-70, Math.min(70, -midLat * 0.4));
-
-  return [
-    { lat: o.lat, lng: o.lon, altitude: 0.02 },
-    { lat: sweepLat, lng: sweepLon, altitude: 0.45 },
-    { lat: d.lat, lng: d.lon, altitude: 0.02 }
-  ];
+// ── Arc colour helpers ─────────────────────────────────────────────────────────
+function arcColorFor(cost) {
+  // Solid bright colours — gradients look bad with small dot dash lengths
+  if (cost > 8000) return ["rgba(255,80,0,0)",  "rgba(255,90,10,1)",  "rgba(255,80,0,0)"];
+  if (cost > 5000) return ["rgba(255,170,0,0)", "rgba(255,185,0,1)",  "rgba(255,170,0,0)"];
+  if (cost > 3000) return ["rgba(0,210,255,0)",  "rgba(0,220,255,1)",  "rgba(0,210,255,0)"];
+  return                   ["rgba(80,140,255,0)", "rgba(90,155,255,1)", "rgba(80,140,255,0)"];
 }
 
-function toPathData(rows) {
-  return rows.map((r) => ({
-    points: buildSweepPath(r.origin, r.destination),
-    color: n(r.adjusted_cost) > 5000 ? "#f97316" : n(r.adjusted_cost) > 2000 ? "#fb7185" : "#60a5fa",
-    width: n(r.adjusted_cost) > 5000 ? 1.1 : n(r.adjusted_cost) > 2000 ? 0.8 : 0.55,
-    label: `${r.origin} -> ${r.destination} (${r.carrier})\n${money(r.adjusted_cost)} | ${r.shipment_count} shipments`
-  }));
+function arcAltFor(o, d) {
+  const dLat = o.lat - d.lat;
+  const dLon = o.lon - d.lon;
+  const dist = Math.sqrt(dLat * dLat + dLon * dLon);
+  return Math.min(0.25, Math.max(0.08, dist / 200));
+}
+
+function toArcData(rows) {
+  return rows.map((r) => {
+    const o = coordFor(r.origin);
+    const d = coordFor(r.destination);
+    const cost = n(r.adjusted_cost);
+    return {
+      startLat: o.lat, startLng: o.lon,
+      endLat:   d.lat, endLng:   d.lon,
+      color:    arcColorFor(cost),
+      altitude: arcAltFor(o, d),
+      stroke:   cost > 8000 ? 1.4 : cost > 5000 ? 1.1 : 0.8,
+      animTime: cost > 8000 ? 8000 : cost > 5000 ? 10000 : 13000,
+      label:    `${r.origin} → ${r.destination}\n${money(cost)} · ${r.carrier}`
+    };
+  });
+}
+
+// ── Hub point markers ──────────────────────────────────────────────────────────
+function getPointsData(rows) {
+  const hubs = new Map();
+  rows.forEach((r) => {
+    [{ name: r.origin, w: 1 }, { name: r.destination, w: 0.6 }].forEach(({ name, w }) => {
+      const c = coordFor(name);
+      const existing = hubs.get(name) || { lat: c.lat, lng: c.lon, name, vol: 0 };
+      existing.vol += n(r.adjusted_cost) * w;
+      hubs.set(name, existing);
+    });
+  });
+  return [...hubs.values()].map((h) => {
+    const col = h.vol > 20000 ? "rgba(255,80,0,0.9)" : h.vol > 10000 ? "rgba(255,170,0,0.85)" : "rgba(60,180,255,0.8)";
+    return { lat: h.lat, lng: h.lng, label: h.name, color: col, r: Math.min(0.55, Math.max(0.18, h.vol / 40000)) };
+  });
+}
+
+// ── Pulsing rings at top hubs ──────────────────────────────────────────────────
+function getRingsData(rows) {
+  const hubs = new Map();
+  rows.forEach((r) => {
+    const c = coordFor(r.origin);
+    const ex = hubs.get(r.origin) || { lat: c.lat, lng: c.lon, vol: 0 };
+    ex.vol += n(r.adjusted_cost);
+    hubs.set(r.origin, ex);
+  });
+  return [...hubs.values()]
+    .sort((a, b) => b.vol - a.vol)
+    .slice(0, 5)
+    .map((h) => ({
+      lat: h.lat, lng: h.lng,
+      color: (t) => `rgba(255,${Math.round(140 + 60 * t)},0,${(1 - t) * 0.6})`,
+      maxR: 4, speed: 2, period: 900
+    }));
 }
 
 function setModeBadge() {
   const badge = document.getElementById("mode-badge");
+  if (!badge) return;
   badge.textContent = state.uploadMode ? "UPLOADED MODE" : "DEMO MODE";
   badge.classList.toggle("mode-badge--upload", state.uploadMode);
 }
@@ -249,19 +288,14 @@ function updateImpactHeader() {
       ? "Uploaded session"
       : "Unknown";
 
-  document.getElementById("impact-baseline").textContent = baseline ? money(baseline) : "--";
-  document.getElementById("impact-savings").textContent = state.uploadMode
-    ? "Run Python model"
-    : best
-      ? `${money(best.absolute_savings)} (${pct(best.savings_pct)})`
-      : "--";
-  document.getElementById("impact-top-lane").textContent = top ? `${top.origin} -> ${top.destination}` : "--";
-  document.getElementById("impact-freshness").textContent = freshness;
-
-  const confidence = document.getElementById("impact-confidence");
-  confidence.textContent = state.uploadMode
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl("impact-baseline", baseline ? money(baseline) : "--");
+  setEl("impact-savings", state.uploadMode ? "Run Python model" : best ? `${money(best.absolute_savings)} (${pct(best.savings_pct)})` : "--");
+  setEl("impact-top-lane", top ? `${top.origin} -> ${top.destination}` : "--");
+  setEl("impact-freshness", freshness);
+  setEl("impact-confidence", state.uploadMode
     ? "Confidence: uploaded CSV processed locally in browser. No data leaves your device."
-    : "Confidence: pipeline outputs reconciled with route-level network.";
+    : "Confidence: pipeline outputs reconciled with route-level network.");
 }
 
 function buildFilters() {
@@ -314,18 +348,32 @@ function renderScenarioList() {
     return;
   }
 
-  el.innerHTML = state.scenarioRows
+  const sorted = state.scenarioRows
     .slice()
-    .sort((a, b) => n(b.absolute_savings) - n(a.absolute_savings))
+    .sort((a, b) => n(b.absolute_savings) - n(a.absolute_savings));
+
+  el.innerHTML = sorted
     .map(
       (r, i) => `
-      <article class="scenario-item ${state.selectedScenario === r.scenario ? "scenario-item--active" : ""}">
+      <article class="scenario-item ${state.selectedScenario === r.scenario ? "scenario-item--active" : ""}" data-scenario="${r.scenario}">
         <div class="scenario-item__head"><strong>#${i + 1} ${r.scenario.replaceAll("_", " ")}</strong><span>${money(r.absolute_savings)}</span></div>
         <p>Savings ${pct(r.savings_pct)} | Risk ${String(r.risk_level).toUpperCase()}</p>
       </article>
     `
     )
     .join("");
+
+  el.querySelectorAll(".scenario-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      state.selectedScenario = item.dataset.scenario;
+      const sf = document.getElementById("scenario-filter");
+      if (sf) sf.value = state.selectedScenario;
+      renderScenarioList();
+      renderComparisonPanel();
+      renderExecutiveBrief();
+      renderGlobeOrFallback();
+    });
+  });
 }
 
 function renderDriverList() {
@@ -338,10 +386,13 @@ function renderDriverList() {
   box.innerHTML = state.driverRows
     .slice(0, 8)
     .map(
-      (r) => `
+      (r, i) => `
       <article class="driver-item">
-        <strong>${String(r.source_table || "driver").replace("by_", "").replaceAll("_", " ")}: ${r.driver_value}</strong>
-        <p>${money(r.total_cost)} | ${pct(r.cost_share_pct)} share</p>
+        <div class="driver-item__rank">${i + 1}</div>
+        <div class="driver-item__body">
+          <strong>${String(r.source_table || "driver").replace("by_", "").replaceAll("_", " ")}: ${r.driver_value}</strong>
+          <p>${money(r.total_cost)} &mdash; ${pct(r.cost_share_pct)} share</p>
+        </div>
       </article>
     `
     )
@@ -407,60 +458,201 @@ function initGlobe() {
   if (!window.Globe || !webglSupported()) return false;
 
   state.globe = window.Globe()(el)
-    .globeImageUrl("https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
-    .backgroundImageUrl("https://unpkg.com/three-globe/example/img/night-sky.png")
+    .globeImageUrl("https://unpkg.com/three-globe/example/img/earth-night.jpg")
+    .backgroundImageUrl(null)
     .showAtmosphere(true)
-    .atmosphereColor("#60a5fa")
-    .atmosphereAltitude(0.18)
-    .pathColor("color")
-    .pathPointLat("lat")
-    .pathPointLng("lng")
-    .pathPointAlt("altitude")
-    .pathStroke("width")
-    .pathLabel("label")
-    .pathTransitionDuration(0);
+    .atmosphereColor("#2255cc")
+    .atmosphereAltitude(0.15)
+    // Animated arcs (comets)
+    .arcsData([])
+    .arcStartLat("startLat").arcStartLng("startLng")
+    .arcEndLat("endLat").arcEndLng("endLng")
+    .arcColor("color")
+    .arcAltitude("altitude")
+    .arcStroke("stroke")
+    .arcDashLength(0.01)
+    .arcDashGap(0.03)
+    .arcDashAnimateTime("animTime")
+    .arcLabel("label")
+    // Glow dots at hubs
+    .pointsData([])
+    .pointLat("lat").pointLng("lng")
+    .pointColor("color")
+    .pointAltitude(0.005)
+    .pointRadius("r")
+    .pointLabel("label")
+    // Pulsing rings at top hubs
+    .ringsData([])
+    .ringLat("lat").ringLng("lng")
+    .ringColor("color")
+    .ringMaxRadius("maxR")
+    .ringPropagationSpeed("speed")
+    .ringRepeatPeriod("period");
 
   setGlobeSize();
-  state.globe.pointOfView({ lat: 18, lng: 20, altitude: 2.35 }, 0);
+
+  // Transparent WebGL background so the CSS star field shows through seamlessly
+  try {
+    const renderer = state.globe.renderer();
+    renderer.setClearColor(0x000000, 0);
+    renderer.domElement.style.background = "transparent";
+    // Also force any globe.gl-injected wrapper divs to be transparent
+    el.querySelectorAll("div").forEach(d => { d.style.background = "transparent"; });
+  } catch (_) {}
+
+  state.globe.pointOfView({ lat: 20, lng: 15, altitude: 2.2 }, 0);
   const controls = state.globe.controls();
   controls.autoRotate = true;
-  controls.autoRotateSpeed = 0.12;
-  controls.minDistance = 160;
-  controls.maxDistance = 420;
+  controls.autoRotateSpeed = 0.10;
+  controls.minDistance = 150;
+  controls.maxDistance = 500;
+
+  // Dynamic circular alpha mask that blends the globe edges into page background.
+  const globeShell = document.querySelector(".globe-shell");
+  const updateMaskFromZoom = () => {
+    if (!state.globe || !globeShell) return;
+    const altitude = state.globe.pointOfView().altitude ?? 2.2;
+    const t = Math.min(1, Math.max(0, (2.2 - altitude) / (2.2 - 0.55)));
+    const corePct = 33 + t * 18;
+    const softPct = 20 - t * 5;
+    globeShell.style.setProperty("--mask-core", `${corePct.toFixed(2)}%`);
+    globeShell.style.setProperty("--mask-soft", `${softPct.toFixed(2)}%`);
+  };
+  state.maskUpdater = updateMaskFromZoom;
+  updateMaskFromZoom();
+  if (controls && typeof controls.addEventListener === "function") {
+    controls.addEventListener("change", updateMaskFromZoom);
+  }
 
   window.addEventListener("resize", () => {
     setGlobeSize();
+    updateMaskFromZoom();
   });
+
+  // Canvas pixel manipulation: load the night texture, boost city light pixels
+  // selectively via a non-linear power curve, then feed the modified image back
+  // via globeImageUrl() — the official API, cannot be overridden by globe.gl internals.
+  // Pixels brighter than threshold get boosted (city lights), dark pixels (ocean) stay dark.
+  // RGB channels are scaled proportionally so hue is fully preserved.
+  const boostLights = () => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = "https://unpkg.com/three-globe/example/img/earth-night.jpg";
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width;
+      c.height = img.height;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, c.width, c.height);
+      for (let i = 0; i < d.data.length; i += 4) {
+        const r = d.data[i], g = d.data[i + 1], b = d.data[i + 2];
+        const brightness = (r + g + b) / 3;
+        // City lights are warm (yellow/white): R and G are high relative to B.
+        // Ocean pixels are blue-dominant: B > R and B > G.
+        // Only boost pixels that are warm (not blue-dominant) and bright enough.
+        const isWarm = (r + g) > b * 1.8;
+        if (brightness > 35 && isWarm) {
+          // Boost city lights and shift toward warm yellow by reducing blue channel
+          const boost = Math.min(5, Math.pow(brightness / 255, 0.3) * 6);
+          d.data[i]     = Math.min(255, r * boost);
+          d.data[i + 1] = Math.min(255, g * boost * 0.92);
+          d.data[i + 2] = Math.min(255, b * boost * 0.5); // reduce blue → warm yellow glow
+        } else {
+          // Keep the base darker so directional light creates a clear day/night split.
+          const suppress = isWarm ? 0.68 : 0.56;
+          d.data[i]     = Math.min(255, r * suppress);
+          d.data[i + 1] = Math.min(255, g * suppress);
+          d.data[i + 2] = Math.min(255, b * (isWarm ? suppress : suppress * 0.88));
+        }
+      }
+      ctx.putImageData(d, 0, 0);
+      // Use PNG to avoid JPEG compression blocking artifacts
+      state.globe.globeImageUrl(c.toDataURL("image/png"));
+    };
+    img.onerror = () => {};
+  };
+  setTimeout(boostLights, 500);
+
+  // Replace globe.gl's default lights with a directional "sun" from upper-left.
+  // Balanced fill lights preserve depth so one hemisphere reads as day and the other as night.
+  const addSunLight = () => {
+    try {
+      if (!window.THREE) { setTimeout(addSunLight, 400); return; }
+      // Remove existing lights so the setup below is deterministic.
+      const toRemove = [];
+      state.globe.scene().traverse(obj => { if (obj.isLight) toRemove.push(obj); });
+      toRemove.forEach(l => l.parent && l.parent.remove(l));
+
+      // Force globe material to respond more strongly to directional light.
+      const globeMat = state.globe.globeMaterial && state.globe.globeMaterial();
+      if (globeMat) {
+        globeMat.emissive = new window.THREE.Color(0x000000);
+        globeMat.emissiveIntensity = 0;
+        globeMat.shininess = 18;
+        globeMat.specular = new window.THREE.Color(0x5f7ea8);
+        globeMat.needsUpdate = true;
+      }
+
+      // Primary warm key light ("sun")
+      const sun = new window.THREE.DirectionalLight(0xfff0c7, 4.4);
+      sun.position.set(-320, 120, 220);
+      state.globe.scene().add(sun);
+
+      // Near-zero ambient to keep the night side dark.
+      const ambient = new window.THREE.AmbientLight(0x0a1222, 0.04);
+      state.globe.scene().add(ambient);
+
+      // Soft sky/ground contribution to avoid hard clipping at the terminator.
+      const hemi = new window.THREE.HemisphereLight(0x3b5f96, 0x070d18, 0.12);
+      state.globe.scene().add(hemi);
+
+      // Cool, weak rim/fill from opposite side for subtle contour.
+      const rim = new window.THREE.DirectionalLight(0x375b93, 0.10);
+      rim.position.set(240, -70, -180);
+      state.globe.scene().add(rim);
+    } catch (_) {}
+  };
+  setTimeout(addSunLight, 800);
+
+  // Cloud layer — slightly larger sphere with transparent cloud texture
+  const addClouds = () => {
+    try {
+      if (!window.THREE) { setTimeout(addClouds, 400); return; }
+      const geo = new window.THREE.SphereGeometry(101, 64, 64);
+      const tex = new window.THREE.TextureLoader().load(
+        "https://unpkg.com/three-globe/example/img/earth-clouds.png"
+      );
+      const mat = new window.THREE.MeshLambertMaterial({
+        map: tex, transparent: true, opacity: 0.7, depthWrite: false
+      });
+      const clouds = new window.THREE.Mesh(geo, mat);
+      state.globe.scene().add(clouds);
+      // Slowly counter-rotate clouds
+      const tick = () => { clouds.rotation.y += 0.00008; requestAnimationFrame(tick); };
+      tick();
+    } catch (_) {}
+  };
+  setTimeout(addClouds, 1000);
 
   return true;
 }
 
-function renderGlobeOrFallback() {
-  const rows = filteredRoutes();
+function render2DMap(rows) {
   const note = document.getElementById("map-note");
-
-  if (state.globe) {
-    const data = toPathData(rows);
-    state.globe.pathsData(data);
-    note.textContent = `3D globe active. Showing ${rows.length} highest-cost filtered routes.`;
-    return;
-  }
-
-  const mapEl = document.getElementById("map-view");
-  mapEl.hidden = false;
-  document.getElementById("globe-view").hidden = true;
-
   if (!window.L) {
-    note.textContent = "Route map unavailable: Leaflet library did not load.";
+    note.textContent = "Leaflet library unavailable.";
     return;
   }
 
   if (!state.map) {
-    state.map = window.L.map("map-view", { zoomControl: true }).setView([10, 15], 2);
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    state.map = window.L.map("map-view", { zoomControl: false }).setView([15, 20], 2);
+    window.L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       maxZoom: 14,
-      attribution: "&copy; OpenStreetMap contributors"
+      attribution: "&copy; OpenStreetMap &copy; CARTO"
     }).addTo(state.map);
+  } else {
+    setTimeout(() => state.map.invalidateSize(), 100);
   }
 
   state.mapLayers.forEach((l) => state.map.removeLayer(l));
@@ -469,21 +661,56 @@ function renderGlobeOrFallback() {
   rows.forEach((r) => {
     const o = coordFor(r.origin);
     const d = coordFor(r.destination);
+    const cost = n(r.adjusted_cost);
+    const color = cost > 8000 ? "#ff4444" : cost > 5000 ? "#ff9500" : cost > 3000 ? "#ffcc00" : "#00d4ff";
+    const weight = cost > 8000 ? 4 : cost > 5000 ? 3 : 2;
     const line = window.L.polyline([[o.lat, o.lon], [d.lat, d.lon]], {
-      color: "#2563eb",
-      weight: n(r.adjusted_cost) > 5000 ? 5 : 3,
-      opacity: 0.75
-    }).bindPopup(`${r.origin} -> ${r.destination}<br>${money(r.adjusted_cost)} (${r.carrier})`);
+      color, weight, opacity: 0.85
+    }).bindPopup(`<strong>${r.origin} → ${r.destination}</strong><br>${money(cost)} · ${r.carrier}`);
     line.addTo(state.map);
     state.mapLayers.push(line);
+
+    // origin/dest markers
+    [{ lat: o.lat, lng: o.lon, name: r.origin }, { lat: d.lat, lng: d.lon, name: r.destination }].forEach(pt => {
+      const m = window.L.circleMarker([pt.lat, pt.lng], {
+        radius: 4, fillColor: color, fillOpacity: 0.9, color: "#fff", weight: 1
+      }).bindTooltip(pt.name);
+      m.addTo(state.map);
+      state.mapLayers.push(m);
+    });
   });
 
   if (state.mapLayers.length) {
-    const group = window.L.featureGroup(state.mapLayers);
-    state.map.fitBounds(group.getBounds().pad(0.25));
+    try {
+      const group = window.L.featureGroup(state.mapLayers.filter(l => l.getBounds));
+      if (group.getLayers().length) state.map.fitBounds(group.getBounds().pad(0.2));
+    } catch(_) {}
+  }
+  note.textContent = `Showing ${rows.length} routes.`;
+}
+
+function renderGlobeOrFallback() {
+  const rows = filteredRoutes();
+  const note = document.getElementById("map-note");
+  const globeEl = document.getElementById("globe-view");
+  const mapEl = document.getElementById("map-view");
+
+  if (state.viewMode === "2d" || !state.globe) {
+    globeEl.hidden = true;
+    mapEl.hidden = false;
+    render2DMap(rows);
+    return;
   }
 
-  note.textContent = `2D fallback active. Showing ${rows.length} filtered routes.`;
+  // 3D globe
+  globeEl.hidden = false;
+  mapEl.hidden = true;
+  state.globe
+    .arcsData(toArcData(rows))
+    .pointsData(getPointsData(rows))
+    .ringsData(getRingsData(rows));
+  if (typeof state.maskUpdater === "function") state.maskUpdater();
+  note.textContent = `Showing ${rows.length} routes.`;
 }
 
 function aggregateUploadedRows(rows) {
@@ -550,48 +777,284 @@ function setUploadStatus(text, isError = false) {
   el.classList.toggle("upload-status--error", isError);
 }
 
+
+// ── Chart.js native charts ────────────────────────────────────────────────────
+const CHART_COLORS = ["#7a1f2a", "#9a3348", "#27b87a", "#9b7fe8", "#e05252", "#29b8c8", "#7a3446", "#5c1a2a"];
+const ROUTE_HIGH_COLOR = "#7a1f2a";
+const ROUTE_LIGHT_LOW_1 = "#cf96a4";
+const ROUTE_LIGHT_LOW_2 = "#e2b5bf";
+const STANDARD_NEUTRAL = "#7e8797";
+
+function destroyChart(id) {
+  if (state.charts[id]) {
+    state.charts[id].destroy();
+    delete state.charts[id];
+  }
+}
+
+function renderCharts() {
+  if (typeof Chart === "undefined") return;
+
+  const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "rgba(8,12,24,0.96)",
+        titleColor: "#c8d4e8",
+        bodyColor: "#4f6480",
+        borderColor: "rgba(180,200,240,0.1)",
+        borderWidth: 1,
+        titleFont: { family: "Inter", size: 12, weight: "600" },
+        bodyFont: { family: "Inter", size: 11 },
+        padding: 10,
+        cornerRadius: 8
+      }
+    }
+  };
+
+  // Chart 1: Scenario savings bar
+  const scenEl = document.getElementById("chart-scenarios");
+  if (scenEl && state.scenarioRows.length) {
+    destroyChart("scenarios");
+    const sorted = [...state.scenarioRows].sort((a, b) => n(b.absolute_savings) - n(a.absolute_savings));
+    state.charts.scenarios = new Chart(scenEl, {
+      type: "bar",
+      data: {
+        labels: sorted.map(r => r.scenario.replaceAll("_", " ")),
+        datasets: [{
+          data: sorted.map(r => n(r.absolute_savings)),
+          backgroundColor: sorted.map((_, i) => CHART_COLORS[i % CHART_COLORS.length] + "cc"),
+          borderColor: sorted.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+          borderWidth: 1.5,
+          borderRadius: 6,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        ...chartDefaults,
+        plugins: {
+          ...chartDefaults.plugins,
+          tooltip: {
+            ...chartDefaults.plugins.tooltip,
+            callbacks: { label: ctx => " " + money(ctx.parsed.y) }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { family: "Inter", size: 11, weight: "600" }, color: "#4f6480" }
+          },
+          y: {
+            grid: { color: "rgba(180,200,240,0.07)", lineWidth: 1 },
+            ticks: {
+              font: { family: "Inter", size: 10 }, color: "#4f6480",
+              callback: v => "$" + (v >= 1000 ? (v / 1000).toFixed(0) + "k" : v)
+            },
+            beginAtZero: true
+          }
+        }
+      }
+    });
+  }
+
+  // Chart 2: Top routes horizontal bar
+  const routesEl = document.getElementById("chart-routes");
+  if (routesEl && state.routeRows.length) {
+    destroyChart("routes");
+    const top8 = [...state.routeRows].sort((a, b) => n(b.total_cost) - n(a.total_cost)).slice(0, 8);
+    const routeLabels = top8.map((r) => `${r.origin.replace(" Hub", "")} → ${r.destination}`);
+    const routeColors = top8.map((r, i) => {
+      const label = `${r.origin} -> ${r.destination}`.toLowerCase();
+      if (label.includes("mumbai") && label.includes("new zealand")) return ROUTE_LIGHT_LOW_1;
+      if (label.includes("nairobi") && label.includes("united kingdom")) return ROUTE_LIGHT_LOW_2;
+      if (i === 6) return ROUTE_LIGHT_LOW_1;
+      if (i === 7) return ROUTE_LIGHT_LOW_2;
+      return CHART_COLORS[i % CHART_COLORS.length];
+    });
+    state.charts.routes = new Chart(routesEl, {
+      type: "bar",
+      data: {
+        labels: routeLabels,
+        datasets: [{
+          data: top8.map(r => n(r.total_cost)),
+          backgroundColor: routeColors.map((c) => `${c}cc`),
+          borderColor: routeColors,
+          borderWidth: 1.5,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        ...chartDefaults,
+        indexAxis: "y",
+        plugins: {
+          ...chartDefaults.plugins,
+          tooltip: {
+            ...chartDefaults.plugins.tooltip,
+            callbacks: { label: ctx => " " + money(ctx.parsed.x) }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: "rgba(180,200,240,0.07)", lineWidth: 1 },
+            ticks: {
+              font: { family: "Inter", size: 10 }, color: "#4f6480",
+              callback: v => "$" + (v >= 1000 ? (v / 1000).toFixed(0) + "k" : v)
+            },
+            beginAtZero: true
+          },
+          y: {
+            grid: { display: false },
+            ticks: { font: { family: "Inter", size: 10 }, color: "#4f6480" }
+          }
+        }
+      }
+    });
+  }
+
+  // Chart 3: Carrier donut
+  const carriersEl = document.getElementById("chart-carriers");
+  const carrierData = state.driverRows.filter(r => r.source_table === "by_carrier");
+  if (carriersEl && carrierData.length) {
+    destroyChart("carriers");
+    state.charts.carriers = new Chart(carriersEl, {
+      type: "doughnut",
+      data: {
+        labels: carrierData.map(r => r.driver_value),
+        datasets: [{
+          data: carrierData.map(r => n(r.total_cost)),
+          backgroundColor: CHART_COLORS.slice(0, carrierData.length),
+          borderColor: "transparent",
+          borderWidth: 0,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        ...chartDefaults,
+        plugins: {
+          ...chartDefaults.plugins,
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: { font: { family: "Inter", size: 11 }, padding: 12, usePointStyle: true, color: "#c8d4e8" }
+          },
+          tooltip: {
+            ...chartDefaults.plugins.tooltip,
+            callbacks: { label: ctx => " " + money(ctx.parsed) + " (" + ctx.label + ")" }
+          }
+        },
+        cutout: "62%"
+      }
+    });
+  }
+
+  // Chart 4: Urgency donut
+  const urgencyEl = document.getElementById("chart-urgency");
+  const urgencyData = state.driverRows.filter(r => r.source_table === "by_urgency");
+  if (urgencyEl && urgencyData.length) {
+    destroyChart("urgency");
+    const sortedUrgencyData = [...urgencyData].sort((a, b) => {
+      const aLabel = String(a.driver_value || "").toLowerCase();
+      const bLabel = String(b.driver_value || "").toLowerCase();
+      const rank = (label) => (label.includes("standard") ? 0 : label.includes("urgent") ? 1 : 2);
+      return rank(aLabel) - rank(bLabel);
+    });
+    const urgencyColors = sortedUrgencyData.map((r, i) => {
+      const label = String(r.driver_value || "").toLowerCase();
+      if (label.includes("urgent")) return ROUTE_HIGH_COLOR;
+      if (label.includes("standard")) return STANDARD_NEUTRAL;
+      return CHART_COLORS[i % CHART_COLORS.length];
+    });
+    state.charts.urgency = new Chart(urgencyEl, {
+      type: "doughnut",
+      data: {
+        labels: sortedUrgencyData.map(r => r.driver_value),
+        datasets: [{
+          data: sortedUrgencyData.map(r => n(r.total_cost)),
+          backgroundColor: urgencyColors,
+          borderColor: "transparent",
+          borderWidth: 0,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        ...chartDefaults,
+        plugins: {
+          ...chartDefaults.plugins,
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: { font: { family: "Inter", size: 11 }, padding: 12, usePointStyle: true, color: "#c8d4e8" }
+          },
+          tooltip: {
+            ...chartDefaults.plugins.tooltip,
+            callbacks: { label: ctx => " " + money(ctx.parsed) + " (" + ctx.label + ")" }
+          }
+        },
+        cutout: "62%"
+      }
+    });
+  }
+}
+
 function wireControls() {
   const scenario = document.getElementById("scenario-filter");
-  const carrier = document.getElementById("carrier-filter");
-  const topn = document.getElementById("topn-filter");
-  const topnValue = document.getElementById("topn-value");
-  const rotateBtn = document.getElementById("animation-toggle");
-  const overlayToggle = document.getElementById("overlay-toggle");
-  const overlayBody = document.getElementById("overlay-body");
+
+  // Data source controls (top strip)
+  const btnDemo = document.getElementById("btn-demo");
+  const btnUpload = document.getElementById("btn-upload");
+  const uploadPanel = document.getElementById("upload-panel");
   const uploadInput = document.getElementById("upload-csv");
-  const resetUpload = document.getElementById("reset-upload");
 
-  scenario.addEventListener("change", () => {
-    state.selectedScenario = scenario.value;
-    renderScenarioList();
-    renderComparisonPanel();
-    renderExecutiveBrief();
-    renderGlobeOrFallback();
+  // Globe 3D / 2D toggle
+  const btn3d = document.getElementById("btn-3d");
+  const btn2d = document.getElementById("btn-2d");
+  if (btn3d && btn2d) {
+    btn3d.addEventListener("click", () => {
+      state.viewMode = "3d";
+      btn3d.classList.add("view-tab--active");
+      btn2d.classList.remove("view-tab--active");
+      document.getElementById("globe-view").hidden = false;
+      document.getElementById("map-view").hidden = true;
+      renderGlobeOrFallback();
+    });
+    btn2d.addEventListener("click", () => {
+      state.viewMode = "2d";
+      btn2d.classList.add("view-tab--active");
+      btn3d.classList.remove("view-tab--active");
+      renderGlobeOrFallback();
+    });
+  }
+
+  // scenario filter still wires from leaderboard clicks; keep dropdown in sync
+  if (scenario) {
+    scenario.addEventListener("change", () => {
+      state.selectedScenario = scenario.value;
+      renderScenarioList();
+      renderComparisonPanel();
+      renderExecutiveBrief();
+      renderGlobeOrFallback();
+    });
+  }
+
+  btnDemo.addEventListener("click", async () => {
+    if (uploadInput) uploadInput.value = "";
+    setUploadStatus("No file selected.");
+    uploadPanel.hidden = true;
+    btnDemo.classList.add("ds-tab--active");
+    btnDemo.setAttribute("aria-selected", "true");
+    btnUpload.classList.remove("ds-tab--active");
+    btnUpload.setAttribute("aria-selected", "false");
+    await loadDefaultData();
   });
 
-  carrier.addEventListener("change", () => {
-    state.selectedCarrier = carrier.value;
-    renderGlobeOrFallback();
-  });
-
-  topn.addEventListener("input", () => {
-    state.topN = n(topn.value);
-    topnValue.textContent = String(state.topN);
-    renderGlobeOrFallback();
-  });
-
-  rotateBtn.addEventListener("click", () => {
-    state.rotating = !state.rotating;
-    rotateBtn.textContent = state.rotating ? "Pause Rotation" : "Play Rotation";
-    if (state.globe) {
-      state.globe.controls().autoRotate = state.rotating;
-    }
-  });
-
-  overlayToggle.addEventListener("click", () => {
-    const collapsed = overlayBody.classList.toggle("overlay-body--collapsed");
-    overlayToggle.textContent = collapsed ? "Controls" : "Hide Controls";
-    overlayToggle.setAttribute("aria-expanded", String(!collapsed));
+  btnUpload.addEventListener("click", () => {
+    uploadPanel.hidden = false;
+    btnUpload.classList.add("ds-tab--active");
+    btnUpload.setAttribute("aria-selected", "true");
+    btnDemo.classList.remove("ds-tab--active");
+    btnDemo.setAttribute("aria-selected", "false");
   });
 
   uploadInput.addEventListener("change", async () => {
@@ -620,16 +1083,11 @@ function wireControls() {
       renderComparisonPanel();
       renderExecutiveBrief();
       renderGlobeOrFallback();
+      renderCharts();
       setUploadStatus(`Loaded ${file.name} locally.`);
     } catch (err) {
       setUploadStatus(err.message || "Upload failed.", true);
     }
-  });
-
-  resetUpload.addEventListener("click", async () => {
-    uploadInput.value = "";
-    setUploadStatus("No file uploaded.");
-    await loadDefaultData();
   });
 }
 
@@ -650,7 +1108,12 @@ async function loadDefaultData() {
   state.routeRows = routeRows || [];
   state.metadata = metadata;
   state.coords = coords || {};
-  state.selectedScenario = "baseline";
+
+  // Default to the best-savings scenario so Before/After shows non-zero
+  const bestScen = [...state.scenarioRows]
+    .sort((a, b) => n(b.absolute_savings) - n(a.absolute_savings))
+    .find((r) => n(r.absolute_savings) > 0);
+  state.selectedScenario = bestScen ? bestScen.scenario : "baseline";
   state.selectedCarrier = "all";
 
   setModeBadge();
@@ -661,6 +1124,7 @@ async function loadDefaultData() {
   renderComparisonPanel();
   renderExecutiveBrief();
   renderGlobeOrFallback();
+  renderCharts();
 }
 
 async function bootstrap() {
@@ -678,7 +1142,7 @@ async function bootstrap() {
 
 bootstrap().catch((err) => {
   const confidence = document.getElementById("impact-confidence");
-  confidence.textContent = `Confidence: partial output state. ${err.message}`;
+  if (confidence) confidence.textContent = `Confidence: partial output state. ${err.message}`;
   document.getElementById("scenario-list").innerHTML =
     '<p class="empty">Required output artifacts missing. Generate outputs/tables and outputs/metadata.json.</p>';
   document.getElementById("driver-list").innerHTML =

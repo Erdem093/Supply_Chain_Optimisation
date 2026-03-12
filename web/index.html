@@ -3,204 +3,182 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Supply Tracker | Supply Chain Optimisation Intelligence</title>
+    <title>Supply Tracker | Supply Chain Cost Intelligence</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-      crossorigin=""
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <header class="hero">
-      <div class="shell">
-        <nav class="nav">
-          <a class="brand" href="#top">Supply Tracker</a>
-        </nav>
-
-        <div class="hero-grid">
-          <div>
-            <p class="kicker">Supply Chain Cost Optimisation</p>
-            <h1>Reduce logistics spend with route-level intelligence and scenario simulation.</h1>
-            <p class="hero-copy">
-              A deployable analytics product that exposes where costs accumulate, quantifies savings opportunities, and
-              converts analysis into an implementation-ready executive plan.
-            </p>
-          </div>
-
-          <div class="impact-header" aria-live="polite">
-            <h2>Impact Header <span id="mode-badge" class="mode-badge">DEMO MODE</span></h2>
-            <div class="impact-grid">
-              <article>
-                <p>Baseline Cost</p>
-                <strong id="impact-baseline">--</strong>
-              </article>
-              <article>
-                <p>Best Savings</p>
-                <strong id="impact-savings">--</strong>
-              </article>
-              <article>
-                <p>Top Lane</p>
-                <strong id="impact-top-lane">--</strong>
-              </article>
-              <article>
-                <p>Data Freshness</p>
-                <strong id="impact-freshness">--</strong>
-              </article>
-            </div>
-            <p class="confidence" id="impact-confidence">Confidence: waiting for generated outputs...</p>
+    <header class="topbar">
+      <div class="shell topbar__inner">
+        <a class="brand" href="#">Supply Tracker</a>
+        <div class="topbar__right">
+          <div class="ds-tabs" role="tablist">
+            <button id="btn-demo" class="ds-tab ds-tab--active" role="tab" aria-selected="true" type="button">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Demo
+            </button>
+            <button id="btn-upload" class="ds-tab" role="tab" aria-selected="false" type="button">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload CSV
+            </button>
           </div>
         </div>
       </div>
     </header>
 
-    <main class="shell">
-      <section id="route-intel" class="section">
-        <div class="section-title-row">
-          <h2>Interactive Route Intelligence</h2>
-          <p>Global route sweeps with 3D globe and automatic 2D fallback.</p>
-        </div>
+    <!-- Upload panel — fixed overlay below topbar, shown only when upload mode active -->
+    <div id="upload-panel" class="upload-panel upload-panel--overlay" hidden>
+      <label class="file-pick" for="upload-csv">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        Choose CSV file
+        <input id="upload-csv" type="file" accept=".csv,text/csv" />
+      </label>
+      <p id="upload-status" class="upload-status">No file selected.</p>
+    </div>
 
-        <div class="map-panel">
-          <div id="globe-view" class="viz-canvas"></div>
-          <div id="map-view" class="viz-canvas" hidden></div>
+    <main>
+      <div class="shell">
 
-          <aside id="overlay-controls" class="overlay-controls" aria-label="Globe controls">
-            <button id="overlay-toggle" class="btn btn-small btn-overlay" type="button" aria-expanded="true">
-              Hide Controls
-            </button>
-            <div id="overlay-body" class="overlay-body">
-              <label>
-                Scenario
-                <select id="scenario-filter"></select>
-              </label>
-              <label>
-                Carrier
-                <select id="carrier-filter"></select>
-              </label>
-              <label>
-                Top Routes
-                <input id="topn-filter" type="range" min="3" max="40" step="1" value="12" />
-                <span id="topn-value">12</span>
-              </label>
-              <button id="animation-toggle" class="btn btn-small" type="button">Pause Rotation</button>
+        <section id="route-intel" class="section">
+          <!-- Scenario filter: visually hidden, used by leaderboard click wiring -->
+          <select id="scenario-filter" style="display:none"></select>
+          <select id="carrier-filter" style="display:none"></select>
 
-              <div class="upload-box">
-                <label>
-                  Upload CSV (local only)
-                  <input id="upload-csv" type="file" accept=".csv,text/csv" />
-                </label>
-                <button id="reset-upload" class="btn btn-small btn-ghost" type="button">Use Demo Data</button>
-                <p id="upload-status" class="upload-status">No file uploaded.</p>
+          <div class="globe-shell">
+            <div id="globe-view" class="viz-canvas"></div>
+            <div id="map-view" class="viz-canvas" hidden></div>
+            <p id="map-note" class="map-note"></p>
+            <div class="globe-view-toggle">
+              <button id="btn-3d" class="view-tab view-tab--active" type="button">3D GLOBE</button>
+              <button id="btn-2d" class="view-tab" type="button">2D MAP</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="section two-col">
+          <article class="card">
+            <div class="card__hd">
+              <div>
+                <h3>Before vs After</h3>
+                <p>Scenario-adjusted logistics cost view</p>
               </div>
             </div>
-          </aside>
+            <div class="compare-grid">
+              <div class="metric-box">
+                <p class="metric-box__lbl">Baseline Cost</p>
+                <p id="compare-baseline" class="metric-box__val">--</p>
+              </div>
+              <div class="metric-box">
+                <p class="metric-box__lbl">Scenario Cost</p>
+                <p id="compare-scenario" class="metric-box__val">--</p>
+              </div>
+              <div class="metric-box metric-box--hl">
+                <p class="metric-box__lbl">Absolute Savings</p>
+                <p id="compare-savings" class="metric-box__val">--</p>
+              </div>
+              <div class="metric-box metric-box--hl">
+                <p class="metric-box__lbl">Savings %</p>
+                <p id="compare-savings-pct" class="metric-box__val">--</p>
+              </div>
+            </div>
+            <p id="compare-note" class="compare-note"></p>
+          </article>
 
-          <p id="map-note" class="map-note">Loading route visualization...</p>
+          <article class="card">
+            <div class="card__hd">
+              <div>
+                <h3>Scenario Leaderboard</h3>
+                <p>Click a scenario to apply it across all panels</p>
+              </div>
+            </div>
+            <div id="scenario-list" class="scenario-list"></div>
+          </article>
         </div>
-      </section>
 
-      <section class="section two-col">
-        <article class="panel">
-          <div class="panel-head">
-            <h3>Before vs After</h3>
-            <p>Scenario-adjusted logistics cost view</p>
+        <section id="executive-brief" class="section card">
+          <div class="card__hd">
+            <div>
+              <h3>Executive Brief</h3>
+              <p>Decision-ready recommendations for leadership</p>
+            </div>
           </div>
-          <div class="compare-grid">
+          <div class="brief-grid">
+            <article class="brief-block">
+              <h4>Opportunity Summary</h4>
+              <p id="brief-opportunity">Loading summary...</p>
+            </article>
+            <article class="brief-block">
+              <h4>Prioritized Actions</h4>
+              <ol id="brief-actions" class="brief-list"></ol>
+            </article>
+            <article class="brief-block">
+              <h4>Risk &amp; Assumptions</h4>
+              <ul id="brief-risks" class="brief-list"></ul>
+            </article>
+            <article class="brief-block">
+              <h4>30 / 60 / 90-Day Plan</h4>
+              <ul id="brief-3090" class="brief-list"></ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="section card">
+          <div class="card__hd">
             <div>
-              <p class="metric-label">Baseline Cost</p>
-              <p id="compare-baseline" class="metric-value">--</p>
-            </div>
-            <div>
-              <p class="metric-label">Scenario Cost</p>
-              <p id="compare-scenario" class="metric-value">--</p>
-            </div>
-            <div>
-              <p class="metric-label">Absolute Savings</p>
-              <p id="compare-savings" class="metric-value highlight">--</p>
-            </div>
-            <div>
-              <p class="metric-label">Savings %</p>
-              <p id="compare-savings-pct" class="metric-value highlight">--</p>
+              <h3>Top Cost Drivers</h3>
+              <p>Dominant contributors to baseline logistics spend</p>
             </div>
           </div>
-          <p id="compare-note" class="compare-note"></p>
-        </article>
+          <div id="driver-list" class="driver-list"></div>
+        </section>
 
-        <article class="panel">
-          <div class="panel-head">
-            <h3>Scenario Leaderboard</h3>
-            <p>Prioritized by value</p>
+        <section class="section card" id="analytics-charts">
+          <div class="card__hd">
+            <div>
+              <h3>Analytics</h3>
+              <p>Interactive charts built live from pipeline data</p>
+            </div>
           </div>
-          <div id="scenario-list" class="scenario-list"></div>
-        </article>
-      </section>
+          <div class="charts-grid">
+            <div class="chart-card chart-card--wide">
+              <h4 class="chart-card__title">Scenario Savings Comparison</h4>
+              <p class="chart-card__sub">Modelled absolute savings (USD) per scenario</p>
+              <div class="chart-wrap">
+                <canvas id="chart-scenarios"></canvas>
+              </div>
+            </div>
+            <div class="chart-card chart-card--wide">
+              <h4 class="chart-card__title">Top Routes by Cost</h4>
+              <p class="chart-card__sub">Highest-spend lanes in the network</p>
+              <div class="chart-wrap">
+                <canvas id="chart-routes"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <h4 class="chart-card__title">Cost by Carrier Mode</h4>
+              <p class="chart-card__sub">Freight spend distribution</p>
+              <div class="chart-wrap chart-wrap--donut">
+                <canvas id="chart-carriers"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <h4 class="chart-card__title">Standard vs Urgent</h4>
+              <p class="chart-card__sub">Shipment urgency cost split</p>
+              <div class="chart-wrap chart-wrap--donut">
+                <canvas id="chart-urgency"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
 
-      <section id="executive-brief" class="section panel">
-        <div class="panel-head">
-          <h3>Executive Brief</h3>
-          <p>Recommendation output, transformed for decision makers</p>
-        </div>
-
-        <div class="brief-grid">
-          <article>
-            <h4>Opportunity Summary</h4>
-            <p id="brief-opportunity">Loading summary...</p>
-          </article>
-          <article>
-            <h4>Prioritized Actions</h4>
-            <ol id="brief-actions" class="brief-list"></ol>
-          </article>
-          <article>
-            <h4>Risk & Assumptions</h4>
-            <ul id="brief-risks" class="brief-list"></ul>
-          </article>
-          <article>
-            <h4>30 / 60 / 90-Day Plan</h4>
-            <ul id="brief-3090" class="brief-list"></ul>
-          </article>
-        </div>
-      </section>
-
-      <section class="section panel">
-        <div class="panel-head">
-          <h3>Top Cost Drivers</h3>
-          <p>Dominant contributors to baseline spend</p>
-        </div>
-        <div id="driver-list" class="driver-list"></div>
-      </section>
-
-      <section class="section panel">
-        <div class="panel-head">
-          <h3>Generated Visuals</h3>
-          <p>Output figures from the analytics pipeline</p>
-        </div>
-        <div class="gallery">
-          <figure>
-            <img src="../outputs/figures/scenario_savings.png" alt="Scenario savings chart" loading="lazy" />
-            <figcaption>Scenario savings comparison</figcaption>
-          </figure>
-          <figure>
-            <img src="../outputs/figures/by_route.png" alt="Route cost drivers chart" loading="lazy" />
-            <figcaption>Route-level cost concentration</figcaption>
-          </figure>
-          <figure>
-            <img src="../outputs/figures/by_carrier.png" alt="Carrier cost drivers chart" loading="lazy" />
-            <figcaption>Carrier-level cost concentration</figcaption>
-          </figure>
-        </div>
-      </section>
+      </div>
     </main>
 
     <footer class="footer">
-      <div class="shell footer-inner">
+      <div class="shell footer__inner">
         <p>Built for transport cost-to-serve optimization and stakeholder-ready decisioning.</p>
         <div class="socials">
           <a href="https://github.com/Erdem093" target="_blank" rel="noreferrer">GitHub</a>
@@ -210,12 +188,9 @@
     </footer>
 
     <script src="https://unpkg.com/three@0.165.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/globe.gl"></script>
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-      crossorigin=""
-    ></script>
+    <script src="https://unpkg.com/globe.gl/dist/globe.gl.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
