@@ -4,6 +4,9 @@ Supply Tracker is a supply-chain cost intelligence app with two parts:
 - A Python pipeline that analyzes logistics spend and writes output artifacts.
 - A browser UI (`/web`) that visualizes routes on an interactive 3D globe, compares baseline vs scenario costs, and supports local CSV upload.
 
+## Live Demo
+- Vercel (Live Demo): `https://supply-chain-optimisation-3d2nsuysp-erdem093s-projects.vercel.app/web/`
+
 ## What The App Does
 - Ranks top routes and cost drivers (route, carrier, geography, shipment size, urgency).
 - Shows route intelligence in:
